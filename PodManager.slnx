@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PodManager.App/PodManager.App.csproj" />
+    <Project Path="src/PodManager.Core/PodManager.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PodManager.Tests/PodManager.Tests.csproj" />
+  </Folder>
+</Solution>

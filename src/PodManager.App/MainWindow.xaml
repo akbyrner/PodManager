@@ -1,0 +1,871 @@
+<Window x:Class="PodManager.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PodManager.App"
+        Title="PodManager" Width="1280" Height="800" MinWidth="940" MinHeight="560"
+        Background="White" UseLayoutRounding="True">
+
+  <Window.InputBindings>
+    <KeyBinding Key="I" Modifiers="Control" Command="{Binding EditCommand}" />
+    <KeyBinding Key="Delete" Command="{Binding DeleteCommand}" />
+    <KeyBinding Key="F5" Command="{Binding RescanCommand}" />
+  </Window.InputBindings>
+
+  <DockPanel x:Name="Root" Background="White">
+
+    <!-- ================= Top bar ================= -->
+    <Border DockPanel.Dock="Top" Height="66" Background="{StaticResource TopBarBrush}"
+            BorderBrush="#8E8E8E" BorderThickness="0,0,0,1">
+      <Grid Margin="10,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Style="{StaticResource ToolButton}" Command="{Binding RescanCommand}" ToolTip="Read the iPod again (F5)">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE72C;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBlock Text="Rescan" />
+            </StackPanel>
+          </Button>
+          <Button Style="{StaticResource ToolButton}" Command="{Binding EditCommand}" ToolTip="Edit the selected songs (Ctrl+I)">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE946;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBlock Text="Get Info" />
+            </StackPanel>
+          </Button>
+          <Button Style="{StaticResource ToolButton}" Command="{Binding EjectCommand}" ToolTip="Eject the iPod so it's safe to unplug">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#x23CF;" FontFamily="Segoe UI Symbol" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBlock Text="Eject" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <!-- LCD-style status panel -->
+        <Border Grid.Column="1" Width="470" Height="50" CornerRadius="6" Background="{StaticResource LcdBrush}"
+                BorderBrush="#9A9E8E" BorderThickness="1" VerticalAlignment="Center">
+          <Grid Margin="14,4">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+              <TextBlock Text="&#xE8D6;" FontFamily="{StaticResource IconFont}" FontSize="12" Foreground="#4A4F45"
+                         VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBlock Text="{Binding DeviceTitle}" FontWeight="SemiBold" Foreground="#2F332B" />
+            </StackPanel>
+            <TextBlock Grid.Row="1" Text="{Binding StatusText}" Foreground="#4A4F45" FontSize="11"
+                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}" />
+            <ProgressBar Grid.Row="2" Height="5" Margin="50,3,50,0" VerticalAlignment="Top"
+                         Value="{Binding ProgressValue, Mode=OneWay}" IsIndeterminate="{Binding IsIndeterminate}"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"
+                         Foreground="#5E86C1" Background="#D6D9CB" BorderThickness="0" />
+          </Grid>
+        </Border>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Button Style="{StaticResource ToolButton}" Content="Stop" Command="{Binding CancelCommand}" Margin="0,0,8,0"
+                  Visibility="{Binding CanCancel, Converter={StaticResource BoolToVis}}" />
+          <TextBox x:Name="Search" Style="{StaticResource SearchBox}" Width="230" Height="25" Tag="Search"
+                   Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ================= Capacity bar ================= -->
+    <Border DockPanel.Dock="Bottom" Background="#ECEEF1" BorderBrush="{StaticResource DividerBrush}"
+            BorderThickness="0,1,0,0" Padding="16,8,16,7">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" MaxWidth="760" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Visibility="{Binding HasLibrary, Converter={StaticResource BoolToVis}}">
+          <Border CornerRadius="7" Height="14" BorderBrush="#8E959E" BorderThickness="1" Background="#E4E6E9" ClipToBounds="True">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{Binding AudioWidth}" />
+                <ColumnDefinition Width="{Binding OtherWidth}" />
+                <ColumnDefinition Width="{Binding FreeWidth}" />
+              </Grid.ColumnDefinitions>
+              <Rectangle Grid.Column="0" Fill="#3D88D9" />
+              <Rectangle Grid.Column="1" Fill="#F0C04A" />
+              <Rectangle Grid.Column="2" Fill="#E4E6E9" />
+              <Rectangle Grid.ColumnSpan="3" Height="6" VerticalAlignment="Top" Fill="#40FFFFFF" />
+            </Grid>
+          </Border>
+          <StackPanel Orientation="Horizontal" Margin="2,4,0,0">
+            <Ellipse Width="9" Height="9" Fill="#3D88D9" Margin="0,0,5,0" />
+            <TextBlock Text="{Binding AudioText}" Margin="0,0,16,0" FontSize="11" />
+            <Ellipse Width="9" Height="9" Fill="#F0C04A" Margin="0,0,5,0" />
+            <TextBlock Text="{Binding OtherText}" Margin="0,0,16,0" FontSize="11" />
+            <Ellipse Width="9" Height="9" Fill="#C9CDD2" Stroke="#9AA1AA" Margin="0,0,5,0" />
+            <TextBlock Text="{Binding FreeText}" Margin="0,0,16,0" FontSize="11" />
+            <TextBlock Text="{Binding CapacityText}" Foreground="{StaticResource SubtleTextBrush}" FontSize="11" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <TextBlock Text="{Binding LibrarySummary}" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+          <Button Command="{Binding GoToSyncCommand}" Cursor="Hand" Margin="14,0,0,0" ToolTip="Open Sync"
+                  Visibility="{Binding HasLibrary, Converter={StaticResource BoolToVis}}">
+            <Button.Template>
+              <ControlTemplate TargetType="Button">
+                <Border x:Name="b" CornerRadius="9" Padding="9,2" Background="#E1E6EC">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE895;" FontFamily="{StaticResource IconFont}" FontSize="11" VerticalAlignment="Center" Margin="0,0,5,0" />
+                    <TextBlock Text="{Binding SyncSummaryShort}" FontSize="11" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Border>
+                <ControlTemplate.Triggers>
+                  <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="b" Property="Background" Value="#D2DCE8" />
+                  </Trigger>
+                  <DataTrigger Binding="{Binding HasFailures}" Value="True">
+                    <Setter TargetName="b" Property="Background" Value="#F6D7D7" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding SyncSummaryShort}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                  </DataTrigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate>
+            </Button.Template>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ================= Main area ================= -->
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="200" MinWidth="150" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Sidebar -->
+      <Border Background="{StaticResource SidebarBrush}">
+        <ListBox ItemsSource="{Binding SidebarView}" SelectedItem="{Binding SelectedSidebar}"
+                 Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource SidebarItem}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.GroupStyle>
+            <GroupStyle>
+              <GroupStyle.HeaderTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource SidebarHeaderBrush}"
+                             Margin="10,14,0,4" />
+                </DataTemplate>
+              </GroupStyle.HeaderTemplate>
+            </GroupStyle>
+          </ListBox.GroupStyle>
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="{x:Type local:SidebarItem}">
+              <DockPanel LastChildFill="True">
+                <Border x:Name="Badge" DockPanel.Dock="Right" Background="#D64545" CornerRadius="8" Padding="6,0" Margin="4,0,0,0"
+                        VerticalAlignment="Center" Visibility="Collapsed">
+                  <TextBlock Text="{Binding DataContext.CurrentErrorCount, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                             Foreground="White" FontSize="10.5" FontWeight="SemiBold" />
+                </Border>
+                <TextBlock Text="{Binding Icon}" FontFamily="{StaticResource IconFont}" FontSize="13" Width="22"
+                           VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Label}" FontSize="12.5" VerticalAlignment="Center" />
+              </DockPanel>
+              <DataTemplate.Triggers>
+                <MultiDataTrigger>
+                  <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding Key}" Value="log" />
+                    <Condition Binding="{Binding DataContext.HasLogErrors, RelativeSource={RelativeSource AncestorType=ListBox}}" Value="True" />
+                  </MultiDataTrigger.Conditions>
+                  <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+              </DataTemplate.Triggers>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Width="1" Background="{StaticResource DividerBrush}" ResizeBehavior="PreviousAndNext" />
+
+      <Grid Grid.Column="2">
+
+        <!-- No iPod -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{Binding ShowEmpty, Converter={StaticResource BoolToVis}}">
+          <Border Width="96" Height="150" CornerRadius="14" BorderBrush="#9AA3AD" BorderThickness="2" Background="#F4F6F8">
+            <Grid>
+              <Border Width="72" Height="54" Margin="0,12,0,0" VerticalAlignment="Top" Background="#DCE3EA" CornerRadius="2" />
+              <Ellipse Width="50" Height="50" Margin="0,0,0,14" VerticalAlignment="Bottom" Stroke="#9AA3AD" StrokeThickness="2" />
+              <Ellipse Width="18" Height="18" Margin="0,0,0,30" VerticalAlignment="Bottom" Stroke="#9AA3AD" StrokeThickness="2" />
+            </Grid>
+          </Border>
+          <TextBlock Text="Connect your iPod" Style="{StaticResource SectionTitle}" HorizontalAlignment="Center" Margin="0,18,0,4" />
+          <TextBlock Text="Slide HOLD on, then plug it in: Knurl starts disk mode and the music shows up here as soon as Windows mounts the drive."
+                     Foreground="{StaticResource SubtleTextBrush}" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="360" />
+        </StackPanel>
+
+        <!-- iPod connected but empty (drawn over the empty views) -->
+        <StackPanel Panel.ZIndex="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{Binding ShowNoMusic, Converter={StaticResource BoolToVis}}">
+          <TextBlock Text="&#xE8D6;" FontFamily="{StaticResource IconFont}" FontSize="44" Foreground="#9BB7DD" HorizontalAlignment="Center" />
+          <TextBlock Text="No music on this iPod yet" Style="{StaticResource SectionTitle}" HorizontalAlignment="Center" Margin="0,12,0,4" />
+          <TextBlock Text="Open Sync to see what's on the server and copy it to the iPod."
+                     Foreground="{StaticResource SubtleTextBrush}" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="380" />
+          <Button Style="{StaticResource PrimaryButton}" Content="Go to Sync" Command="{Binding GoToSyncCommand}"
+                  HorizontalAlignment="Center" Margin="0,14,0,0" Padding="16,5" />
+        </StackPanel>
+
+        <!-- Songs -->
+        <DataGrid x:Name="SongsGrid" Style="{StaticResource SongGrid}" ItemsSource="{Binding SongsView}"
+                  SelectionChanged="Grid_SelectionChanged" MouseDoubleClick="Song_DoubleClick"
+                  Visibility="{Binding ShowSongs, Converter={StaticResource BoolToVis}}">
+          <DataGrid.RowStyle>
+            <Style TargetType="DataGridRow">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsITunesManaged}" Value="True">
+                  <Setter Property="Foreground" Value="#7A869A" />
+                  <Setter Property="ToolTip" Value="Added by iTunes: read-only here" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </DataGrid.RowStyle>
+          <DataGrid.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Get Info" InputGestureText="Ctrl+I"
+                        Command="{Binding PlacementTarget.DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+              <MenuItem Header="Delete from iPod" InputGestureText="Del"
+                        Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+              <Separator />
+              <MenuItem Header="Show in Explorer"
+                        Command="{Binding PlacementTarget.DataContext.ShowInExplorerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            </ContextMenu>
+          </DataGrid.ContextMenu>
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Name" Binding="{Binding DisplayTitle}" Width="2*" />
+            <DataGridTextColumn Header="Time" Binding="{Binding Duration, Converter={StaticResource Duration}}" SortMemberPath="Duration" Width="55" />
+            <DataGridTextColumn Header="Artist" Binding="{Binding DisplayArtist}" Width="1.3*" />
+            <DataGridTextColumn Header="Album" Binding="{Binding DisplayAlbum}" Width="1.5*" />
+            <DataGridTextColumn Header="#" Binding="{Binding TrackNumber, Converter={StaticResource ZeroBlank}}" SortMemberPath="TrackNumber" Width="36" />
+            <DataGridTextColumn Header="Genre" Binding="{Binding Genre}" Width="0.9*" />
+            <DataGridTextColumn Header="Year" Binding="{Binding Year, Converter={StaticResource ZeroBlank}}" SortMemberPath="Year" Width="50" />
+            <DataGridTextColumn Header="Quality" Binding="{Binding QualityText}" Width="95" />
+            <DataGridTextColumn Header="Size" Binding="{Binding Size, Converter={StaticResource Bytes}}" SortMemberPath="Size" Width="70" />
+          </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Albums grid -->
+        <ListBox x:Name="AlbumsList" ItemsSource="{Binding AlbumsView}" ItemTemplate="{StaticResource AlbumTile}" IsSynchronizedWithCurrentItem="False"
+                 ItemContainerStyle="{StaticResource TileItem}" BorderThickness="0" Padding="12,8"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" MouseDoubleClick="Album_DoubleClick"
+                 Visibility="{Binding ShowAlbums, Converter={StaticResource BoolToVis}}">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Open"
+                        Command="{Binding PlacementTarget.DataContext.OpenAlbumCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+              <MenuItem Header="Get Info for Album"
+                        Command="{Binding PlacementTarget.DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+              <MenuItem Header="Delete Album from iPod"
+                        Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+              <Separator />
+              <MenuItem Header="Show in Explorer"
+                        Command="{Binding PlacementTarget.DataContext.ShowInExplorerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                        CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            </ContextMenu>
+          </ListBox.ContextMenu>
+        </ListBox>
+
+        <!-- Album detail -->
+        <Grid Visibility="{Binding ShowAlbumDetail, Converter={StaticResource BoolToVis}}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <Border BorderBrush="#D5DAE0" BorderThickness="0,0,0,1" Padding="22,16">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#F8FAFC" Offset="0" />
+                <GradientStop Color="#EBEFF4" Offset="1" />
+              </LinearGradientBrush>
+            </Border.Background>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Grid Width="180" Height="180">
+                <Border Background="{StaticResource ArtPlaceholderBrush}">
+                  <TextBlock Text="&#xE8D6;" FontFamily="{StaticResource IconFont}" FontSize="56" Foreground="#F4F6F9"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <Image Source="{Binding OpenAlbum.Art}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Border BorderBrush="#33000000" BorderThickness="1" />
+              </Grid>
+              <StackPanel Grid.Column="1" Margin="22,0,0,0">
+                <Button Style="{StaticResource ToolButton}" Command="{Binding CloseAlbumCommand}" HorizontalAlignment="Left" Margin="0,0,0,12">
+                  <TextBlock Text="‹  All Albums" />
+                </Button>
+                <TextBlock Text="{Binding OpenAlbum.Album}" FontSize="24" FontWeight="SemiBold" Foreground="#22272E" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding OpenAlbum.Artist}" FontSize="16" Foreground="{StaticResource AccentBrush}" Margin="0,2,0,6" />
+                <TextBlock Text="{Binding OpenAlbum.Summary}" Foreground="{StaticResource SubtleTextBrush}" />
+                <TextBlock Text="{Binding OpenAlbum.Quality}" Foreground="{StaticResource SubtleTextBrush}" Margin="0,2,0,12" />
+                <StackPanel Orientation="Horizontal">
+                  <Button Style="{StaticResource ToolButton}" Content="Get Info for Album" Margin="0,0,6,0"
+                          Command="{Binding EditCommand}" CommandParameter="{Binding OpenAlbum}" />
+                  <Button Style="{StaticResource ToolButton}" Content="Delete Album from iPod" Margin="0,0,6,0"
+                          Command="{Binding DeleteCommand}" CommandParameter="{Binding OpenAlbum}" />
+                  <Button Style="{StaticResource ToolButton}" Content="Show in Explorer"
+                          Command="{Binding ShowInExplorerCommand}" CommandParameter="{Binding OpenAlbum}" />
+                </StackPanel>
+              </StackPanel>
+            </Grid>
+          </Border>
+          <DataGrid Grid.Row="1" Style="{StaticResource SongGrid}" ItemsSource="{Binding OpenAlbumTracks}"
+                    SelectionChanged="Grid_SelectionChanged" MouseDoubleClick="Song_DoubleClick">
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Get Info" InputGestureText="Ctrl+I"
+                          Command="{Binding PlacementTarget.DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                <MenuItem Header="Delete from iPod" InputGestureText="Del"
+                          Command="{Binding PlacementTarget.DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                <Separator />
+                <MenuItem Header="Show in Explorer"
+                          Command="{Binding PlacementTarget.DataContext.ShowInExplorerCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="#" Binding="{Binding TrackNumber, Converter={StaticResource ZeroBlank}}" SortMemberPath="TrackNumber" Width="40" />
+              <DataGridTextColumn Header="Name" Binding="{Binding DisplayTitle}" Width="3*" />
+              <DataGridTextColumn Header="Time" Binding="{Binding Duration, Converter={StaticResource Duration}}" SortMemberPath="Duration" Width="60" />
+              <DataGridTextColumn Header="Artist" Binding="{Binding DisplayArtist}" Width="1.5*" />
+              <DataGridTextColumn Header="Quality" Binding="{Binding QualityText}" Width="100" />
+              <DataGridTextColumn Header="Size" Binding="{Binding Size, Converter={StaticResource Bytes}}" SortMemberPath="Size" Width="75" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+
+        <!-- Artists -->
+        <Grid Visibility="{Binding ShowArtists, Converter={StaticResource BoolToVis}}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250" MinWidth="160" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <ListBox ItemsSource="{Binding ArtistsView}" SelectedItem="{Binding SelectedArtist}" BorderThickness="0" IsSynchronizedWithCurrentItem="False"
+                   Background="#F7F9FB" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemContainerStyle>
+              <Style TargetType="ListBoxItem">
+                <Setter Property="Padding" Value="12,5" />
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                      <Border x:Name="b" Padding="{TemplateBinding Padding}" Background="Transparent">
+                        <ContentPresenter />
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                          <Setter TargetName="b" Property="Background" Value="{StaticResource SelectedItemBrush}" />
+                          <Setter Property="Foreground" Value="White" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+              </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+              <DataTemplate DataType="{x:Type local:ArtistVm}">
+                <StackPanel>
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.7" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <GridSplitter Grid.Column="1" Width="1" Background="#D5DAE0" ResizeBehavior="PreviousAndNext" />
+          <DockPanel Grid.Column="2">
+            <TextBlock DockPanel.Dock="Top" Text="{Binding SelectedArtist.Name}" Style="{StaticResource SectionTitle}" Margin="22,16,0,0" />
+            <ListBox ItemsSource="{Binding SelectedArtist.Albums}" ItemTemplate="{StaticResource AlbumTile}"
+                     ItemContainerStyle="{StaticResource TileItem}" BorderThickness="0" Padding="12,4"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" MouseDoubleClick="Album_DoubleClick">
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+            </ListBox>
+          </DockPanel>
+        </Grid>
+
+        <!-- Sync -->
+        <DockPanel Visibility="{Binding ShowSync, Converter={StaticResource BoolToVis}}">
+          <Border DockPanel.Dock="Top" Padding="22,14,22,10" BorderBrush="#D5DAE0" BorderThickness="0,0,0,1" Background="#F7F9FB">
+            <StackPanel>
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Padding="18,6" VerticalAlignment="Top"
+                        Command="{Binding SyncAllCommand}" Content="{Binding SyncAllButtonText}" ToolTip="Copy everything that isn't on the iPod yet (except Never sync)" />
+                <StackPanel Margin="0,0,16,0">
+                  <TextBlock Text="Sync with the server" Style="{StaticResource SectionTitle}" />
+                  <TextBlock Text="{Binding SyncStatusText}" Foreground="{StaticResource SubtleTextBrush}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                </StackPanel>
+              </DockPanel>
+
+              <WrapPanel Margin="0,12,0,4">
+                <RadioButton Style="{StaticResource Chip}" GroupName="SyncFilter" IsChecked="{Binding FilterAll}">
+                  <TextBlock><Run Text="All " /><Run Text="{Binding CountAll, Mode=OneWay, StringFormat=N0}" Foreground="#6B7280" /></TextBlock>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Chip}" GroupName="SyncFilter" IsChecked="{Binding FilterMissing}">
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" Fill="#E0A030" Margin="0,0,6,0" />
+                    <TextBlock><Run Text="Not on iPod " /><Run Text="{Binding CountNeedsSync, Mode=OneWay, StringFormat=N0}" Foreground="#6B7280" /></TextBlock>
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Chip}" GroupName="SyncFilter" IsChecked="{Binding FilterOnIpod}">
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" Fill="#3DAA5C" Margin="0,0,6,0" />
+                    <TextBlock><Run Text="On iPod " /><Run Text="{Binding CountOnIpod, Mode=OneWay, StringFormat=N0}" Foreground="#6B7280" /></TextBlock>
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Chip}" GroupName="SyncFilter" IsChecked="{Binding FilterFailed}">
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" Fill="#D64545" Margin="0,0,6,0" />
+                    <TextBlock><Run Text="Failed " /><Run Text="{Binding CountFailed, Mode=OneWay, StringFormat=N0}" Foreground="#6B7280" /></TextBlock>
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Chip}" GroupName="SyncFilter" IsChecked="{Binding FilterNever}">
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" Fill="#A3AAB3" Margin="0,0,6,0" />
+                    <TextBlock><Run Text="Never sync " /><Run Text="{Binding CountNever, Mode=OneWay, StringFormat=N0}" Foreground="#6B7280" /></TextBlock>
+                  </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Chip}" GroupName="SyncFilter" IsChecked="{Binding FilterOnlyIpod}">
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="8" Height="8" Fill="#8A7DC2" Margin="0,0,6,0" />
+                    <TextBlock><Run Text="Only on iPod " /><Run Text="{Binding CountOnlyIpod, Mode=OneWay, StringFormat=N0}" Foreground="#6B7280" /></TextBlock>
+                  </StackPanel>
+                </RadioButton>
+              </WrapPanel>
+
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding SyncSelectionText}" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal">
+                  <Button Style="{StaticResource ToolButton}" Command="{Binding RefreshSyncCommand}" Margin="0,0,6,0" ToolTip="Check the server again">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="&#xE72C;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                      <TextBlock Text="Refresh" />
+                    </StackPanel>
+                  </Button>
+                  <Button Style="{StaticResource ToolButton}" Command="{Binding SyncSelectedCommand}" ToolTip="Sync the selected songs, or the selected artist/album">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="&#xE895;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                      <TextBlock Text="Sync Selected" />
+                    </StackPanel>
+                  </Button>
+                  <Button Style="{StaticResource ToolButton}" Command="{Binding NeverSyncCommand}" ToolTip="Never copy the selection to the iPod">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="&#xE8D8;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                      <TextBlock Text="Never Sync" />
+                    </StackPanel>
+                  </Button>
+                  <Button Style="{StaticResource ToolButton}" Content="Allow Sync" Command="{Binding AllowSyncCommand}" ToolTip="Let Never sync songs sync again" />
+                  <Button Style="{StaticResource ToolButton}" Command="{Binding RetryFailedCommand}" Margin="12,0,0,0"
+                          Visibility="{Binding HasFailures, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" Foreground="#D64545" VerticalAlignment="Center" Margin="0,0,6,0" />
+                      <TextBlock Text="Retry Failed" />
+                    </StackPanel>
+                  </Button>
+                  <Button Style="{StaticResource ToolButton}" Content="Server Settings…" Command="{Binding OpenSettingsCommand}" Margin="12,0,0,0" />
+                </StackPanel>
+              </DockPanel>
+            </StackPanel>
+          </Border>
+
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="280" MinWidth="180" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TreeView x:Name="SyncTreeView" ItemsSource="{Binding SyncTree}" Background="#F7F9FB" BorderThickness="0" Padding="4,6"
+                      SelectedItemChanged="SyncTree_SelectedItemChanged">
+              <TreeView.ItemContainerStyle>
+                <Style TargetType="TreeViewItem">
+                  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                  <Setter Property="Padding" Value="2,2" />
+                  <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                </Style>
+              </TreeView.ItemContainerStyle>
+              <TreeView.ItemTemplate>
+                <HierarchicalDataTemplate DataType="{x:Type local:SyncNodeVm}" ItemsSource="{Binding Children}">
+                  <Grid Width="220">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="8" Height="8" Fill="{Binding State, Converter={StaticResource NodeBrush}}" Margin="0,0,7,0" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding Counts}" Foreground="#7A8494" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" />
+                  </Grid>
+                </HierarchicalDataTemplate>
+              </TreeView.ItemTemplate>
+              <TreeView.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Sync"
+                            Command="{Binding PlacementTarget.DataContext.SyncSelectedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                            CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                  <MenuItem Header="Never Sync"
+                            Command="{Binding PlacementTarget.DataContext.NeverSyncCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                            CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                  <MenuItem Header="Allow Sync"
+                            Command="{Binding PlacementTarget.DataContext.AllowSyncCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                            CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                </ContextMenu>
+              </TreeView.ContextMenu>
+            </TreeView>
+
+            <GridSplitter Grid.Column="1" Width="1" Background="#D5DAE0" ResizeBehavior="PreviousAndNext" />
+
+            <DataGrid x:Name="SyncGrid" Grid.Column="2" Style="{StaticResource SongGrid}" ItemsSource="{Binding SyncTracksView}"
+                      SelectionChanged="SyncGrid_SelectionChanged">
+              <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                  <Setter Property="ToolTip" Value="{Binding Error}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Error}" Value="{x:Null}">
+                      <Setter Property="ToolTip" Value="{x:Null}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Status}" Value="NeverSync">
+                      <Setter Property="Foreground" Value="#8A929C" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </DataGrid.RowStyle>
+              <DataGrid.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Sync Selected"
+                            Command="{Binding PlacementTarget.DataContext.SyncSelectedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                  <MenuItem Header="Never Sync"
+                            Command="{Binding PlacementTarget.DataContext.NeverSyncCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                  <MenuItem Header="Allow Sync"
+                            Command="{Binding PlacementTarget.DataContext.AllowSyncCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                </ContextMenu>
+              </DataGrid.ContextMenu>
+              <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Status" Width="115" SortMemberPath="Status">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="8" Height="8" Fill="{Binding Status, Converter={StaticResource StatusBrush}}" Margin="0,0,7,0" />
+                        <TextBlock Text="{Binding Status, Converter={StaticResource StatusText}}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Name" Binding="{Binding Title}" Width="2*" />
+                <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="1.2*" />
+                <DataGridTextColumn Header="Album" Binding="{Binding Album}" Width="1.5*" />
+                <DataGridTextColumn Header="#" Binding="{Binding TrackNumber, Converter={StaticResource ZeroBlank}}" SortMemberPath="TrackNumber" Width="36" />
+                <DataGridTextColumn Header="Size" Binding="{Binding EstimatedBytes, Converter={StaticResource Bytes}}" SortMemberPath="EstimatedBytes" Width="70" />
+                <DataGridTextColumn Header="Problem" Binding="{Binding Error}" Width="1.6*">
+                  <DataGridTextColumn.ElementStyle>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Foreground" Value="#C03A3A" />
+                      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                    </Style>
+                  </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+              </DataGrid.Columns>
+            </DataGrid>
+          </Grid>
+        </DockPanel>
+
+        <!-- Transfer log -->
+        <DockPanel Visibility="{Binding ShowLog, Converter={StaticResource BoolToVis}}">
+          <Border DockPanel.Dock="Top" Padding="22,14,22,12" BorderBrush="#D5DAE0" BorderThickness="0,0,0,1" Background="#F7F9FB">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button Style="{StaticResource ToolButton}" Command="{Binding RetryFailedCommand}" Margin="0,0,6,0">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" Foreground="#D64545" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBlock Text="Retry Failed" />
+                  </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolButton}" Content="Clear History" Command="{Binding ClearHistoryCommand}" />
+              </StackPanel>
+              <StackPanel>
+                <TextBlock Text="Transfer Log" Style="{StaticResource SectionTitle}" />
+                <TextBlock Text="{Binding LogStatusText}" Foreground="{StaticResource SubtleTextBrush}" TextWrapping="Wrap" Margin="0,3,16,0" />
+              </StackPanel>
+            </DockPanel>
+          </Border>
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" MinHeight="80" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" MinHeight="120" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="CURRENT PROBLEMS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource SidebarHeaderBrush}" Margin="16,10,0,4" />
+            <DataGrid Grid.Row="1" Style="{StaticResource SongGrid}" ItemsSource="{Binding CurrentErrors}">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Song" Binding="{Binding Song}" Width="1.4*" />
+                <DataGridTextColumn Header="Why it failed" Binding="{Binding Reason}" Width="2.2*">
+                  <DataGridTextColumn.ElementStyle>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Foreground" Value="#C03A3A" />
+                      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                      <Setter Property="ToolTip" Value="{Binding Reason}" />
+                    </Style>
+                  </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="When" Binding="{Binding Time, StringFormat=g}" Width="130" />
+              </DataGrid.Columns>
+            </DataGrid>
+            <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" Background="#E3E7EC" ResizeDirection="Rows" />
+            <TextBlock Grid.Row="3" Text="HISTORY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource SidebarHeaderBrush}" Margin="16,8,0,4" />
+            <Grid Grid.Row="4">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.1*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <DataGrid Style="{StaticResource SongGrid}" SelectionMode="Single" ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="When" Binding="{Binding Started, StringFormat=g}" Width="130" />
+                  <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="80" />
+                  <DataGridTextColumn Header="Result" Binding="{Binding Summary}" Width="*" />
+                  <DataGridTextColumn Header="Time" Binding="{Binding Duration, Converter={StaticResource Duration}}" Width="55" />
+                </DataGrid.Columns>
+              </DataGrid>
+              <GridSplitter Grid.Column="1" Width="1" Background="#D5DAE0" ResizeBehavior="PreviousAndNext" />
+              <DataGrid Grid.Column="2" Style="{StaticResource SongGrid}" ItemsSource="{Binding SelectedRun.Failures}">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Failed in this run" Binding="{Binding Song}" Width="*" />
+                  <DataGridTextColumn Header="Why" Binding="{Binding Reason}" Width="1.3*">
+                    <DataGridTextColumn.ElementStyle>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#C03A3A" />
+                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                        <Setter Property="ToolTip" Value="{Binding Reason}" />
+                      </Style>
+                    </DataGridTextColumn.ElementStyle>
+                  </DataGridTextColumn>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </Grid>
+        </DockPanel>
+
+        <!-- Settings -->
+        <DockPanel Visibility="{Binding ShowSettings, Converter={StaticResource BoolToVis}}" Background="#F3F5F8">
+          <!-- footer: save / revert -->
+          <Border DockPanel.Dock="Bottom" Background="#ECEEF1" BorderBrush="#D5DAE0" BorderThickness="0,1,0,0" Padding="22,9">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Style="{StaticResource ToolButton}" Content="Restore Defaults" Command="{Binding RestoreDefaultsCommand}" Margin="0,0,14,0" />
+                <Button Style="{StaticResource ToolButton}" Content="Revert" Command="{Binding RevertSettingsCommand}" Width="80" />
+                <Button Style="{StaticResource PrimaryButton}" Content="Save" Command="{Binding SaveSettingsCommand}" Width="90" Margin="6,0,0,0" />
+              </StackPanel>
+              <TextBlock Text="{Binding SettingsMessage}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,16,0">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="#2F7D46" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding SettingsMessageIsError}" Value="True">
+                        <Setter Property="Foreground" Value="#C03A3A" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+            </DockPanel>
+          </Border>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="22,16,22,22" MaxWidth="820" HorizontalAlignment="Left">
+              <StackPanel.Resources>
+                <Style x:Key="Card" TargetType="Border">
+                  <Setter Property="Background" Value="White" />
+                  <Setter Property="BorderBrush" Value="#D5DAE0" />
+                  <Setter Property="BorderThickness" Value="1" />
+                  <Setter Property="CornerRadius" Value="6" />
+                  <Setter Property="Padding" Value="18,14" />
+                  <Setter Property="Margin" Value="0,0,0,14" />
+                </Style>
+                <Style x:Key="CardTitle" TargetType="TextBlock">
+                  <Setter Property="FontSize" Value="14" />
+                  <Setter Property="FontWeight" Value="SemiBold" />
+                  <Setter Property="Foreground" Value="#22272E" />
+                  <Setter Property="Margin" Value="0,0,0,10" />
+                </Style>
+                <Style x:Key="Label" TargetType="TextBlock">
+                  <Setter Property="Foreground" Value="#4B5563" />
+                  <Setter Property="VerticalAlignment" Value="Center" />
+                  <Setter Property="Margin" Value="0,0,12,0" />
+                </Style>
+                <Style x:Key="Hint" TargetType="TextBlock">
+                  <Setter Property="Foreground" Value="#7A8494" />
+                  <Setter Property="FontSize" Value="11" />
+                  <Setter Property="TextWrapping" Value="Wrap" />
+                  <Setter Property="Margin" Value="0,2,0,8" />
+                </Style>
+                <Style TargetType="CheckBox">
+                  <Setter Property="Margin" Value="0,4,0,0" />
+                  <Setter Property="VerticalContentAlignment" Value="Center" />
+                </Style>
+              </StackPanel.Resources>
+
+              <TextBlock Text="Settings" Style="{StaticResource SectionTitle}" Margin="0,0,0,12" />
+
+              <!-- iPod -->
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="iPod" Style="{StaticResource CardTitle}" />
+                  <TextBlock Text="No iPod connected. Plug it in to rename it or see its details." Foreground="{StaticResource SubtleTextBrush}"
+                             Visibility="{Binding HasDevice, Converter={StaticResource InverseBoolToVis}}" />
+                  <Grid Visibility="{Binding HasDevice, Converter={StaticResource BoolToVis}}">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="140" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Name" Style="{StaticResource Label}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                      <TextBox Style="{StaticResource FieldBox}" Width="200" Height="26" MaxLength="11"
+                               Text="{Binding NewIpodName, UpdateSourceTrigger=PropertyChanged}" />
+                      <Button Style="{StaticResource ToolButton}" Content="Rename" Command="{Binding RenameIpodCommand}" Margin="8,0,0,0" />
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource Hint}">
+                      <Run Text="Up to 11 characters (a FAT32 limit). This is the drive name Windows shows." />
+                      <LineBreak />
+                      <Run Text="{Binding IpodNameProblem, Mode=OneWay}" Foreground="#C03A3A" />
+                    </TextBlock>
+                    <TextBlock Grid.Row="2" Text="Model" Style="{StaticResource Label}" Margin="0,4,12,4" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DeviceModel}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Row="3" Text="Firmware" Style="{StaticResource Label}" Margin="0,4,12,4" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding DeviceFirmware}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <TextBlock Grid.Row="4" Text="Drive" Style="{StaticResource Label}" Margin="0,4,12,4" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding DeviceDrive}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Row="5" Text="Space" Style="{StaticResource Label}" Margin="0,4,12,4" />
+                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding DeviceSpace}" VerticalAlignment="Center" />
+                  </Grid>
+                </StackPanel>
+              </Border>
+
+              <!-- Sync -->
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Sync" Style="{StaticResource CardTitle}" />
+                  <CheckBox Content="Check the server as soon as the iPod connects" IsChecked="{Binding SetCheckOnConnect}" />
+                  <TextBlock Text="Shows what's not synced right away. When off, it's checked when you open Sync. Nothing is ever copied without pressing Sync."
+                             Style="{StaticResource Hint}" Margin="22,2,0,8" />
+                  <CheckBox Content="Eject the iPod when a sync finishes without problems" IsChecked="{Binding SetEjectAfterSync}" />
+                  <TextBlock Text="So it's safe to unplug as soon as the sync is done." Style="{StaticResource Hint}" Margin="22,2,0,8" />
+                  <CheckBox Content="Delete converted copies from the server once they're on the iPod" IsChecked="{Binding SetDeleteAfterTransfer}" />
+                  <TextBlock Text="Only the MP3 copies in the outbox. The lossless originals are never deleted." Style="{StaticResource Hint}" Margin="22,2,0,4" />
+                  <TextBlock Text="{Binding OutboxDeleteWarning}" Foreground="#B7791F" FontSize="11" TextWrapping="Wrap" Margin="22,0,0,0" />
+                </StackPanel>
+              </Border>
+
+              <!-- Server -->
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Server" Style="{StaticResource CardTitle}" />
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="140" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.Resources>
+                      <Style TargetType="TextBox" BasedOn="{StaticResource FieldBox}">
+                        <Setter Property="Height" Value="26" />
+                        <Setter Property="Margin" Value="0,4" />
+                      </Style>
+                    </Grid.Resources>
+                    <TextBlock Text="Server (SSH)" Style="{StaticResource Label}" />
+                    <TextBox Grid.Column="1" Text="{Binding SetRemote, UpdateSourceTrigger=PropertyChanged}" Tag="user@host" />
+                    <TextBlock Grid.Row="1" Text="Lossless library" Style="{StaticResource Label}" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SetLibraryRoot, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Grid.Row="2" Text="iPod outbox" Style="{StaticResource Label}" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SetRemoteRoot, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Grid.Row="3" Text="Converter container" Style="{StaticResource Label}" />
+                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SetContainer, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Grid.Row="4" Text="Folder on the iPod" Style="{StaticResource Label}" />
+                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SetTargetFolder, UpdateSourceTrigger=PropertyChanged}" Width="160" HorizontalAlignment="Left" />
+                  </Grid>
+                  <StackPanel Orientation="Horizontal" Margin="140,8,0,0">
+                    <Button Style="{StaticResource ToolButton}" Command="{Binding TestConnectionCommand}">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE703;" FontFamily="{StaticResource IconFont}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="Test Connection" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                  <TextBlock Text="{Binding ConnectionResult}" TextWrapping="Wrap" Margin="140,8,0,0" FontSize="11.5">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#C03A3A" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding ConnectionOk}" Value="True">
+                            <Setter Property="Foreground" Value="#2F7D46" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </StackPanel>
+              </Border>
+
+              <!-- Advanced -->
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Advanced" Style="{StaticResource CardTitle}" />
+                  <DockPanel Margin="0,0,0,6">
+                    <TextBlock Text="Data folder" Style="{StaticResource Label}" Width="128" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource ToolButton}" Content="Open" Command="{Binding OpenDataFolderCommand}" />
+                    <TextBlock Text="{Binding DataFolder}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="#4B5563" />
+                  </DockPanel>
+                  <TextBlock Text="Settings, the tag cache and the transfer log live here." Style="{StaticResource Hint}" Margin="140,0,0,8" />
+                  <DockPanel>
+                    <TextBlock Text="Tag cache" Style="{StaticResource Label}" Width="128" />
+                    <Button Style="{StaticResource ToolButton}" Content="Clear and Re-read iPod" Command="{Binding ClearCacheCommand}" HorizontalAlignment="Left" />
+                  </DockPanel>
+                  <TextBlock Text="Use if song details look out of date. Re-reading a full iPod takes a few minutes." Style="{StaticResource Hint}" Margin="140,2,0,8" />
+                  <TextBlock Text="{Binding AppVersion}" Foreground="#9AA3AD" FontSize="11" Margin="0,6,0,0" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+
+      </Grid>
+    </Grid>
+  </DockPanel>
+</Window>
