@@ -21,16 +21,25 @@ public static class KnurlDevice
 
     /// <summary>Creates <c>.knurl\battery.log</c> if it's missing (written as zeros: the firmware treats a zero
     /// record as "not written yet"). Never touches an existing log. True if it was created.</summary>
-    public static bool EnsureBatteryLog(string root)
+    public static bool EnsureBatteryLog(string root) => EnsureZeroFile(root, "battery.log", BatteryLogBytes);
+
+    /// <summary>The iPod's settings (shuffle, repeat, volume, backlight, auto-off): one 512-byte sector.</summary>
+    public const int SettingsBytes = 512;
+
+    /// <summary>Creates <c>.knurl\settings.bin</c> if it's missing, zero-filled (the firmware reads zeros as "the
+    /// defaults"). Never touches existing settings. True if it was created.</summary>
+    public static bool EnsureSettings(string root) => EnsureZeroFile(root, "settings.bin", SettingsBytes);
+
+    private static bool EnsureZeroFile(string root, string name, int bytes)
     {
         var dir = Path.Combine(root, KnurlIndex.Folder);
         if (!Directory.Exists(dir)) return false;
-        var path = Path.Combine(dir, "battery.log");
+        var path = Path.Combine(dir, name);
         if (File.Exists(path)) return false;
-        var zeros = new byte[64 * 1024];
+        var zeros = new byte[Math.Min(bytes, 64 * 1024)];
         using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
-            for (var done = 0; done < BatteryLogBytes; done += zeros.Length)
-                fs.Write(zeros, 0, Math.Min(zeros.Length, BatteryLogBytes - done));
+            for (var done = 0; done < bytes; done += zeros.Length)
+                fs.Write(zeros, 0, Math.Min(zeros.Length, bytes - done));
         return true;
     }
 }

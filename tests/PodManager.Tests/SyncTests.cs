@@ -197,6 +197,21 @@ public class KnurlDeviceTests
     }
 
     [Fact]
+    public void Creates_zeroed_settings_once_and_never_overwrites_them()
+    {
+        using var lib = new TempLibrary();
+        var file = Path.Combine(lib.Root, ".knurl", "settings.bin");
+        Assert.True(KnurlDevice.EnsureSettings(lib.Root));
+        var bytes = File.ReadAllBytes(file);
+        Assert.Equal(KnurlDevice.SettingsBytes, bytes.Length);
+        Assert.All(bytes, b => Assert.Equal(0, b));
+        bytes[0] = (byte)'K';                                          // the iPod has saved its settings
+        File.WriteAllBytes(file, bytes);
+        Assert.False(KnurlDevice.EnsureSettings(lib.Root));
+        Assert.Equal((byte)'K', File.ReadAllBytes(file)[0]);
+    }
+
+    [Fact]
     public void Describes_the_firmware_and_finds_the_ipod_by_its_knurl_folder()
     {
         using var lib = new TempLibrary();

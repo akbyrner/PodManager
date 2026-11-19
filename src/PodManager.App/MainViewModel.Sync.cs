@@ -361,6 +361,7 @@ public sealed partial class MainViewModel
             {
                 var written = KnurlIndex.Write(root, tracks, new WpfImageDecoder());
                 KnurlDevice.EnsureBatteryLog(root);
+                KnurlDevice.EnsureSettings(root);
                 return written;
             });
             StatusText = $"{status} Knurl index: {r.Tracks:N0} songs, {r.Albums:N0} albums.";
