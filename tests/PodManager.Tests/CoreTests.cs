@@ -10,6 +10,47 @@ public class SanitizerTests
     [InlineData("Artist./Album /a\"b*c|d<e>f.mp3", @"Artist\Album\a_b_c_d_e_f.mp3")]
     public void Matches_the_sync_script(string remote, string expected) =>
         Assert.Equal(expected, Sanitizer.LocalRelative(remote));
+
+    private const string LongArtist = "The Northbound Lighthouse Orchestra";
+    private const string LongAlbum = "Compass Rose; or, The Long Night Before the Morning - A Record of Ships, Storms and the Slow Return of Every Sailor (2023)";
+    private static string LongSong(int n, string title) =>
+        $"{LongArtist}/{LongAlbum}/{LongArtist} - Compass Rose; or, The Long Night Before the Morning - A Record of Ships, Storms and the Slow Return of Every Sailor - {n:00} - {title}.mp3";
+
+    [Fact]
+    public void Paths_up_to_the_limit_are_never_changed()
+    {
+        var folder = "Velvet Static/" + new string('a', 100) + " (2010)/";
+        var name = new string('b', Sanitizer.MaxRelativeLength - folder.Length - 4) + ".mp3";
+        Assert.Equal(Sanitizer.MaxRelativeLength, (folder + name).Length);
+        Assert.Equal((folder + name).Replace('/', '\\'), Sanitizer.LocalRelative(folder + name));
+    }
+
+    [Fact]
+    public void Too_long_paths_get_short_stable_names_that_keep_the_track_and_title()
+    {
+        var one = Sanitizer.LocalRelative(LongSong(1, "First Light"));
+        var two = Sanitizer.LocalRelative(LongSong(2, "Re-Entry"));
+        Assert.True(LongSong(1, "First Light").Length > 300);
+        Assert.All(new[] { one, two }, k => Assert.True(k.Length <= Sanitizer.MaxRelativeLength, k));
+        Assert.Equal(one, Sanitizer.LocalRelative(LongSong(1, "First Light")));          // same input, same name
+        Assert.EndsWith(" 01 - First Light.mp3", one);
+        Assert.EndsWith(" 02 - Re-Entry.mp3", two);                                     // hyphen in the title
+        var dir = Path.GetDirectoryName(one);
+        Assert.Equal(dir, Path.GetDirectoryName(two));                                  // one album folder
+        Assert.StartsWith(LongArtist + @"\", dir);                                      // short artist kept
+        Assert.Matches(@"~[0-9a-f]{6}$", dir!);
+        Assert.True(Path.GetFileName(dir)!.Length <= 64);
+        Assert.DoesNotContain(new[] { one, two }, k => Path.GetFileName(k).StartsWith(' ') || k.Contains(" ~") );
+    }
+
+    [Fact]
+    public void Albums_that_only_differ_late_in_a_long_name_stay_apart()
+    {
+        string Album(string vol) => $"{LongArtist}/Songs for the Static in My Head, Collected Recordings from the Long Winter, Volume {vol} (2012)/{new string('x', 120)} - 01 - Song.mp3";
+        var a = Path.GetDirectoryName(Sanitizer.LocalRelative(Album("01")));
+        var b = Path.GetDirectoryName(Sanitizer.LocalRelative(Album("02")));
+        Assert.NotEqual(a, b);
+    }
 }
 
 public class ScannerTests

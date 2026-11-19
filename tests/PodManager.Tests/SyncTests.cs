@@ -90,6 +90,7 @@ public class ServerParsingTests
     [Theory]
     [InlineData("remote open(\"/o/A/01 - Song.mp3\"): No such file or directory", null, "Not on the server")]
     [InlineData("remote open(\"/o/A/01 - Song.mp3\"): Permission denied", null, "Permission denied")]
+    [InlineData("Couldn't open local file \"D:/Music/A/01 - Song.mp3.part\" for writing: No such file or directory", null, "Couldn't write it to the iPod")]
     [InlineData("Connection closed by 203.0.113.7", 1000L, "Lost the connection")]
     [InlineData("", 1000L, "Incomplete copy")]
     [InlineData("", null, "Nothing arrived")]

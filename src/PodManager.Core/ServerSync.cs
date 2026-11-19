@@ -386,6 +386,9 @@ public sealed class ServerSync(SyncSettings settings)
                                                 && !l.StartsWith("Fetching", StringComparison.Ordinal));
         if (mention is not null)
         {
+            // sftp couldn't create the file on our side (the iPod), e.g. a path Windows can't hold
+            if (mention.Contains("local file", StringComparison.OrdinalIgnoreCase))
+                return $"Couldn't write it to the iPod: {mention}";
             if (mention.Contains("not found", StringComparison.OrdinalIgnoreCase) || mention.Contains("No such file", StringComparison.OrdinalIgnoreCase))
                 return "Not on the server any more (it may have been converted again or removed). Refresh and try again.";
             if (mention.Contains("Permission denied", StringComparison.OrdinalIgnoreCase))
