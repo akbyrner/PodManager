@@ -148,7 +148,11 @@ public sealed partial class MainViewModel
     };
 
     // ---------------------------------------------------------------- transfer log
-    public IReadOnlyList<TransferRun> Runs => _log.Runs;
+    // A fresh copy each time: the log's list is changed in place (a finished sync is inserted at the top),
+    // and handing WPF the same List again after that makes the DataGrid's generator see an out-of-date
+    // collection and throw on every layout pass.
+    private IReadOnlyList<TransferRun>? _runs;
+    public IReadOnlyList<TransferRun> Runs => _runs ??= _log.Runs.ToList();
 
     private TransferRun? _selectedRun;
     public TransferRun? SelectedRun { get => _selectedRun; set => Set(ref _selectedRun, value); }
@@ -165,6 +169,7 @@ public sealed partial class MainViewModel
 
     private void NotifyLog()
     {
+        _runs = null;
         foreach (var n in new[] { nameof(Runs), nameof(CurrentErrors), nameof(CurrentErrorCount), nameof(HasLogErrors), nameof(LogStatusText) })
             OnPropertyChanged(n);
         SelectedRun = _log.Runs.FirstOrDefault();

@@ -46,6 +46,9 @@ public partial class App : Application
         window.Show();
     }
 
+    private bool _showingError;
+    private DateTime _lastErrorShown;
+
     private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         var log = Path.Combine(AppPaths.DataDirectory, "error.log");
@@ -62,8 +65,21 @@ public partial class App : Application
             Shutdown(1);
             return;
         }
-        MessageBox.Show(MainWindow, $"Something went wrong:\n\n{e.Exception.Message}\n\nDetails were written to {log}.",
-            "PodManager", MessageBoxButton.OK, MessageBoxImage.Error);
+        // The message box pumps messages, which runs layout again. If layout is what threw, a second
+        // error arrives while the first box is open, and showing a box for each one recursed until the
+        // stack overflowed (a crash in dwrite.dll). Show one box at a time, at most every few seconds.
+        if (_showingError || DateTime.UtcNow - _lastErrorShown < TimeSpan.FromSeconds(5)) return;
+        _showingError = true;
+        try
+        {
+            MessageBox.Show(MainWindow, $"Something went wrong:\n\n{e.Exception.Message}\n\nDetails were written to {log}.",
+                "PodManager", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _showingError = false;
+            _lastErrorShown = DateTime.UtcNow;
+        }
     }
 }
 

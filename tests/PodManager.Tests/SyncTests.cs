@@ -88,16 +88,25 @@ public class ServerParsingTests
     }
 
     [Theory]
-    [InlineData("remote open(\"/o/A/01 - Song.mp3\"): No such file or directory", null, "Not on the server")]
-    [InlineData("remote open(\"/o/A/01 - Song.mp3\"): Permission denied", null, "Permission denied")]
-    [InlineData("Couldn't open local file \"D:/Music/A/01 - Song.mp3.part\" for writing: No such file or directory", null, "Couldn't write it to the iPod")]
-    [InlineData("Connection closed by 203.0.113.7", 1000L, "Lost the connection")]
-    [InlineData("", 1000L, "Incomplete copy")]
-    [InlineData("", null, "Nothing arrived")]
-    public void Explains_failures(string stderr, long? got, string expected)
+    [InlineData("remote open(\"/o/A/01 - Song.mp3\"): No such file or directory", null, 0, "Not on the server")]
+    [InlineData("remote open(\"/o/A/01 - Song.mp3\"): Permission denied", null, 0, "Permission denied")]
+    [InlineData("Couldn't open local file \"D:/Music/A/01 - Song.mp3.part\" for writing: No such file or directory", null, 0, "Couldn't write it to the iPod")]
+    [InlineData("Connection closed by 203.0.113.7", 1000L, 255, "Lost the connection")]
+    [InlineData("", 1000L, 1, "Incomplete copy")]
+    [InlineData("", 1000L, 0, "changed on the server")]
+    [InlineData("", null, 0, "Nothing arrived")]
+    public void Explains_failures(string stderr, long? got, int exit, string expected)
     {
-        var exit = stderr.StartsWith("Connection") ? 255 : 0;
         Assert.Contains(expected, ServerSync.ExplainFailure("A/01 - Song.mp3", got, 5000, new ProcessResult(exit, "", stderr)));
+    }
+
+    [Fact]
+    public void Parses_remote_sizes_from_stat()
+    {
+        var sizes = ServerSync.ParseSizes("6532110\tArtist/Album (2008)/01 - Song.mp3\r\n9000\tA/02 - Tab\there.mp3\nnot a line\n");
+        Assert.Equal(6532110, sizes["Artist/Album (2008)/01 - Song.mp3"]);
+        Assert.Equal(9000, sizes["A/02 - Tab\there.mp3"]);
+        Assert.Equal(2, sizes.Count);
     }
 }
 

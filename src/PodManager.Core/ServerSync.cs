@@ -333,21 +333,35 @@ public sealed class ServerSync(SyncSettings settings)
                     throw;
                 }
 
+                // A size that doesn't match the listing usually means the server converted the song
+                // again while we were syncing (the master was replaced). If what arrived matches the
+                // file on the server now, the copy is complete: it's just the newer version.
+                var resized = new Dictionary<string, long>(StringComparer.Ordinal);
+                if (sftp.ExitCode == 0)
+                {
+                    var odd = jobs.Where(j => !unsupported.Contains(j.File.RelativePath) && SafeLength(j.Part) is > 0 and var g && g != j.File.Size)
+                                  .Select(j => j.File.RelativePath).ToList();
+                    if (odd.Count > 0)
+                        foreach (var (rel, size) in await RemoteSizesAsync(odd, CancellationToken.None))
+                            resized[rel] = size;
+                }
+
                 var verified = new List<RemoteFile>();
                 foreach (var job in jobs)
                 {
                     var got = SafeLength(job.Part);
                     string? reason = null;
+                    var expected = resized.TryGetValue(job.File.RelativePath, out var now) && now == got ? now : job.File.Size;
                     if (unsupported.Contains(job.File.RelativePath))
                         reason = "The file name contains both ' and \", which the copier can't handle. Rename it on the server.";
-                    else if (got == job.File.Size)
+                    else if (got == expected)
                     {
                         try
                         {
                             File.Move(job.Part, job.Dst, overwrite: true);
                             copied++;
-                            bytesCopied += job.File.Size;
-                            verified.Add(job.File);
+                            bytesCopied += expected;
+                            verified.Add(job.File with { Size = expected });
                         }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                         {
@@ -377,6 +391,27 @@ public sealed class ServerSync(SyncSettings settings)
         return new SyncResult(copied, bytesCopied, failed);
     }
 
+    /// <summary>Current sizes of outbox files (relative paths); files that are gone are left out.</summary>
+    private async Task<Dictionary<string, long>> RemoteSizesAsync(IReadOnlyList<string> rels, CancellationToken ct)
+    {
+        var command = $"cd {ShellQuote(Settings.RemoteRoot)} && stat -c '%s\t%n' -- " + string.Join(' ', rels.Select(ShellQuote)) + " 2>/dev/null";
+        var result = await ProcessRunner.RunAsync("ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", Settings.Remote, command], ct);
+        return ParseSizes(result.StdOut);
+    }
+
+    internal static Dictionary<string, long> ParseSizes(string output)
+    {
+        var sizes = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var raw in output.Split('\n'))
+        {
+            var line = raw.TrimEnd('\r');
+            var tab = line.IndexOf('\t');
+            if (tab > 0 && long.TryParse(line.AsSpan(0, tab), out var size))
+                sizes[line[(tab + 1)..]] = size;
+        }
+        return sizes;
+    }
+
     /// <summary>Best explanation for a file that didn't arrive complete, using sftp's own messages.</summary>
     internal static string ExplainFailure(string relativePath, long? got, long expected, ProcessResult sftp)
     {
@@ -397,6 +432,8 @@ public sealed class ServerSync(SyncSettings settings)
         }
         if (sftp.ExitCode != 0 && lines.Any(l => l.Contains("Connection", StringComparison.OrdinalIgnoreCase) || l.Contains("timed out", StringComparison.OrdinalIgnoreCase)))
             return "Lost the connection to the server during the copy.";
+        if (got is > 0 && sftp.ExitCode == 0)
+            return $"The file changed on the server during the sync ({got.Value / 1e6:0.0} MB arrived, {expected / 1e6:0.0} MB was listed). Refresh and sync again.";
         if (got is > 0)
             return $"Incomplete copy ({got.Value / 1e6:0.0} of {expected / 1e6:0.0} MB arrived). The iPod may have been disconnected or run out of space.";
         return sftp.ExitCode != 0
