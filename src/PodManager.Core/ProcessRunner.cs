@@ -7,7 +7,10 @@ public sealed record ProcessResult(int ExitCode, string StdOut, string StdErr);
 
 public static class ProcessRunner
 {
-    public static async Task<ProcessResult> RunAsync(string fileName, IEnumerable<string> args, CancellationToken ct = default)
+    /// <param name="onStdOutLine">If given, called with each line of output as it arrives (from a background
+    /// thread, one line at a time); the full output is still returned.</param>
+    public static async Task<ProcessResult> RunAsync(string fileName, IEnumerable<string> args, CancellationToken ct = default,
+        Action<string>? onStdOutLine = null)
     {
         var psi = new ProcessStartInfo(fileName)
         {
@@ -23,7 +26,9 @@ public static class ProcessRunner
 
         using var process = Process.Start(psi) ?? throw new InvalidOperationException($"Couldn't start {fileName}.");
         process.StandardInput.Close();
-        var stdout = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        var stdout = onStdOutLine is null
+            ? process.StandardOutput.ReadToEndAsync(CancellationToken.None)
+            : ReadLinesAsync(process.StandardOutput, onStdOutLine);
         var stderr = process.StandardError.ReadToEndAsync(CancellationToken.None);
         try
         {
@@ -35,5 +40,16 @@ public static class ProcessRunner
             throw;
         }
         return new ProcessResult(process.ExitCode, await stdout, await stderr);
+    }
+
+    private static async Task<string> ReadLinesAsync(StreamReader reader, Action<string> onLine)
+    {
+        var all = new StringBuilder();
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            all.Append(line).Append('\n');
+            onLine(line);
+        }
+        return all.ToString();
     }
 }

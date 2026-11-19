@@ -71,6 +71,20 @@ public class ServerParsingTests
             "{\"rel\": \"A/x.flac\", \"ok\": true, \"out\": \"A/x.mp3\", \"size\": 42}\nnoise\n{\"rel\": \"A/y.flac\", \"ok\": false, \"error\": \"missing\"}\n");
         Assert.Equal(new ConvertResult("A/x.flac", true, "A/x.mp3", 42, null), r["A/x.flac"]);
         Assert.Equal("missing", r["A/y.flac"].Error);
+        Assert.Null(ServerSync.ParseConvertLine("noise"));
+        Assert.Null(ServerSync.ParseConvertLine("{\"half\": "));
+        Assert.Equal(new ConvertResult("A/x.flac", true, "A/x.mp3", 42, null),
+            ServerSync.ParseConvertLine("{\"rel\": \"A/x.flac\", \"ok\": true, \"out\": \"A/x.mp3\", \"size\": 42}"));
+    }
+
+    [Fact]
+    public async Task Hands_over_each_output_line_as_it_arrives_and_still_returns_it_all()
+    {
+        var lines = new List<string>();
+        var r = await ProcessRunner.RunAsync("cmd.exe", ["/c", "echo one& echo two& echo three"], onStdOutLine: lines.Add);
+        Assert.Equal(["one", "two", "three"], lines.Select(l => l.Trim()));
+        Assert.Equal(3, r.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
+        Assert.Equal(0, r.ExitCode);
     }
 
     [Theory]

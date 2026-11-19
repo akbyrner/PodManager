@@ -100,7 +100,8 @@ public sealed record RemoteAlbum(string Key, string Artist, string Album, IReadO
     public long TotalBytes => Files.Sum(f => f.Size);
 }
 
-public sealed record SyncProgress(int FilesDone, int FilesTotal, long BytesDone, long BytesTotal, string Current);
+/// <param name="Converting">True while the server is converting; FilesDone/FilesTotal then count songs converted.</param>
+public sealed record SyncProgress(int FilesDone, int FilesTotal, long BytesDone, long BytesTotal, string Current, bool Converting = false);
 
 /// <summary>A file that didn't make it, and why (path relative to the outbox).</summary>
 public sealed record TransferFailure(string RelativePath, string Reason);
@@ -161,8 +162,10 @@ public sealed class ServerSync(SyncSettings settings)
     /// <summary>
     /// Has the server convert these masters now (even if they were delivered before), via
     /// "docker exec ipod-transcoder python3 transcoder.py convert". Returns one result per master.
+    /// <paramref name="onSongDone"/> is called as each song finishes (the converter prints one line per song).
     /// </summary>
-    public async Task<List<ConvertResult>> ConvertAsync(IReadOnlyList<string> masterRels, CancellationToken ct = default)
+    public async Task<List<ConvertResult>> ConvertAsync(IReadOnlyList<string> masterRels, CancellationToken ct = default,
+        Action<ConvertResult>? onSongDone = null)
     {
         var results = new List<ConvertResult>();
         foreach (var chunk in masterRels.Chunk(100))
@@ -170,7 +173,8 @@ public sealed class ServerSync(SyncSettings settings)
             var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(chunk)));
             var command = $"docker exec {ShellQuote(Settings.TranscoderContainer)} python3 transcoder.py convert {payload}";
             var run = await ProcessRunner.RunAsync("ssh",
-                ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", Settings.Remote, command], ct);
+                ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", Settings.Remote, command], ct,
+                onSongDone is null ? null : line => { if (ParseConvertLine(line) is { } r) onSongDone(r); });
             var parsed = ParseConvertOutput(run.StdOut);
             foreach (var rel in chunk)
             {
@@ -186,21 +190,24 @@ public sealed class ServerSync(SyncSettings settings)
     {
         var map = new Dictionary<string, ConvertResult>(StringComparer.Ordinal);
         foreach (var line in output.Split('\n'))
-        {
-            if (!line.TrimStart().StartsWith('{')) continue;
-            try
-            {
-                using var doc = JsonDocument.Parse(line);
-                var root = doc.RootElement;
-                var rel = root.GetProperty("rel").GetString()!;
-                var ok = root.GetProperty("ok").GetBoolean();
-                map[rel] = ok
-                    ? new ConvertResult(rel, true, root.GetProperty("out").GetString(), root.GetProperty("size").GetInt64(), null)
-                    : new ConvertResult(rel, false, null, 0, root.TryGetProperty("error", out var e) ? e.GetString() : "conversion failed");
-            }
-            catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException) { }
-        }
+            if (ParseConvertLine(line) is { } r) map[r.MasterRel] = r;
         return map;
+    }
+
+    /// <summary>One line of converter output, or null if the line isn't a result.</summary>
+    internal static ConvertResult? ParseConvertLine(string line)
+    {
+        if (!line.TrimStart().StartsWith('{')) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(line);
+            var root = doc.RootElement;
+            var rel = root.GetProperty("rel").GetString()!;
+            return root.GetProperty("ok").GetBoolean()
+                ? new ConvertResult(rel, true, root.GetProperty("out").GetString(), root.GetProperty("size").GetInt64(), null)
+                : new ConvertResult(rel, false, null, 0, root.TryGetProperty("error", out var e) ? e.GetString() : "conversion failed");
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException) { return null; }
     }
 
     private static string FirstLine(string text) =>

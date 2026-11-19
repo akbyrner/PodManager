@@ -304,6 +304,13 @@ public sealed partial class MainViewModel
         BeginBusy($"Syncing {targets.Count:N0} song{(targets.Count == 1 ? "" : "s")}…", cancellable: true);
         var progress = new Progress<SyncProgress>(p =>
         {
+            if (p.Converting && p.FilesTotal > 0)
+            {
+                IsIndeterminate = p.FilesDone == 0;
+                ProgressValue = 100.0 * p.FilesDone / p.FilesTotal;
+                StatusText = p.FilesDone == 0 ? p.Current + "…" : p.Current;
+                return;
+            }
             if (p.BytesTotal <= 0)
             {
                 IsIndeterminate = true;

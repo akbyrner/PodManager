@@ -33,8 +33,18 @@ public sealed class SyncEngine(ServerSync server, string ipodRoot, TransferLog l
             var toConvert = byKey.Values.Where(i => i.OutboxRel is null && i.MasterRel is not null).ToList();
             if (toConvert.Count > 0)
             {
-                progress?.Report(new SyncProgress(0, byKey.Count, 0, 0, $"Converting {toConvert.Count:N0} song{(toConvert.Count == 1 ? "" : "s")} on the server"));
-                var results = await server.ConvertAsync(toConvert.Select(i => i.MasterRel!).ToList(), ct);
+                var total = toConvert.Count;
+                var itemByMaster = toConvert.GroupBy(i => i.MasterRel!, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+                var done = 0;
+                progress?.Report(new SyncProgress(0, total, 0, 0,
+                    $"Converting {total:N0} song{(total == 1 ? "" : "s")} on the server", Converting: true));
+                var results = await server.ConvertAsync(toConvert.Select(i => i.MasterRel!).ToList(), ct, r =>
+                {
+                    done++;
+                    var what = itemByMaster.TryGetValue(r.MasterRel, out var item) ? Describe(item) : r.MasterRel;
+                    progress?.Report(new SyncProgress(done, total, 0, 0,
+                        $"Converting on the server: {done:N0} of {total:N0}  ·  {what}", Converting: true));
+                });
                 var byMaster = results.ToDictionary(r => r.MasterRel, StringComparer.Ordinal);
                 foreach (var item in toConvert)
                 {
